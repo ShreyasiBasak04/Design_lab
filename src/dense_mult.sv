@@ -3,9 +3,9 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date: 01.02.2026 18:45:00
+// Create Date: 01/29/2026 07:49:31 PM
 // Design Name: 
-// Module Name: dense_mult
+// Module Name: mac_pe
 // Project Name: 
 // Target Devices: 
 // Tool Versions: 
@@ -23,32 +23,32 @@
 module dense_mult #(
     parameter N = 3,      // Grid size (N x N)
     parameter DATA_WIDTH = 8, // Data bit-width
-    parameter OUTPUT_WIDTH =32
+    parameter OUTPUT_WIDTH =16
 )(
     input  logic clk,
     input  logic rst_n,
     
     // Inputs from the bottom (a values) - N columns
-    input  logic [DATA_WIDTH-1:0] a_in_bus [N+1:0], 
-    input logic  valid_bit_a_in [N+1:0],
+    input  logic [DATA_WIDTH-1:0] a_in_bus [0:N+1], 
+    input logic  valid_bit_a_in [0:N+1],
     // Inputs from the left (b values) - N rows
-    input  logic [DATA_WIDTH-1:0] b_in_bus [N+1:0],
-    input logic valid_bit_b_in[N+1:0],
+    input  logic [DATA_WIDTH-1:0] b_in_bus [0:N+1],
+    input logic valid_bit_b_in[0:N+1],
     // Outputs (Final accumulated values)
-    output logic [OUTPUT_WIDTH-1:0] s_out_bus [N+1:0],
-    output logic valid_bit_s_out [N+1:0]
+    output logic [OUTPUT_WIDTH-1:0] s_out_bus [0:N+1],
+    output logic [0:N+1] valid_bit_s_out
 );
 
     // Internal wires with generic dimensions
     // a_wire: N+1 rows, N columns (data flows up)
-    logic [DATA_WIDTH-1:0] a_wire [N+1:0][N+1:0];
-    logic valid_bit_a_wire [N+1:0][N+1:0];
+    logic [DATA_WIDTH-1:0] a_wire [0:N+2][0:N+1];
+    logic valid_bit_a_wire [0:N+2][0:N+1];
     // b_wire: N rows, N+1 columns (data flows right)
-    logic [DATA_WIDTH-1:0] b_wire [N+1:0][N+1:0];
-    logic valid_bit_b_wire [N+1:0][N+1:0];
+    logic [DATA_WIDTH-1:0] b_wire [0:N+1][0:N+2];
+    logic valid_bit_b_wire [0:N+1][0:N+2];
     // c_wire: N+1 rows, N+1 columns (data flows diagonally)
-    logic [OUTPUT_WIDTH-1:0] c_wire [N+2:0][N+2:0];
-    logic valid_bit_c_wire [N+2:0][N+2:0];
+    logic [OUTPUT_WIDTH-1:0] c_wire [0:N+2][0:N+2];
+    logic valid_bit_c_wire [0:N+2][0:N+2];
     // --- Boundary Assignments ---
     generate
         for (genvar i = 0; i < N; i++) begin : boundaries
@@ -57,9 +57,9 @@ module dense_mult #(
             assign b_wire[i][0] = b_in_bus[i]; // Left inputs
             assign valid_bit_b_wire[i][0]=valid_bit_b_in[i];
             // Initialize the starting diagonal partial sums to 0
-            assign c_wire[i][0] = 1'b0; 
+            assign c_wire[i][0] = '0; 
             assign valid_bit_c_wire[i][0]=1'b1;
-            assign c_wire[0][i] = 1'b0;
+            assign c_wire[0][i] = '0;
             assign valid_bit_c_wire[0][i]=1'b1;
         end
         //assign c_wire[0][0] = '0; // Corner case
@@ -77,7 +77,7 @@ module dense_mult #(
     generate
         for (genvar r = 0; r < N; r++) begin : row_gen
             for (genvar c = 0; c < N+r; c++) begin : col_gen
-                mac_pe #(8,32) pe_inst (
+                mac_pe #(8,16) pe_inst (
                     .clk   (clk),
                     .rst_n (rst_n),
                     .a_in  (a_wire[r][c]),
@@ -101,7 +101,7 @@ module dense_mult #(
         end
         for(genvar r=3;r<5;r++)begin :row_gen1
             for (genvar c= r-2;c<5;c++) begin: col_gen1
-                mac_pe #(8,32) pe_inst1 (
+                mac_pe #(8,16) pe_inst1 (
                     .clk   (clk),
                     .rst_n (rst_n),
                     .a_in  (a_wire[r][c]),
@@ -137,6 +137,15 @@ module dense_mult #(
         .valid_bit_out(valid_bit_a_wire[1][4])        
         );
         
+        buffer #(8) b14(
+        .clk(clk),
+        .rst_n(rst_n),
+        .valid_bit_in(valid_bit_a_wire[1][4]),
+        .data_in(a_wire[1][4]),
+        .data_out(a_wire[2][4]),
+        .valid_bit_out(valid_bit_a_wire[2][4])        
+        );
+        
         buffer #(8) b30(
         .clk(clk),
         .rst_n(rst_n),
@@ -162,15 +171,6 @@ module dense_mult #(
         .data_in(b_wire[4][1]),
         .data_out(b_wire[4][2]),
         .valid_bit_out(valid_bit_b_wire[4][2])        
-        );
-        
-        buffer #(8) b14(
-        .clk(clk),
-        .rst_n(rst_n),
-        .valid_bit_in(valid_bit_a_wire[1][4]),
-        .data_in(a_wire[1][4]),
-        .data_out(a_wire[2][4]),
-        .valid_bit_out(valid_bit_a_wire[2][4])        
         );
     endgenerate
     assign s_out_bus[0]=c_wire[5][3];
