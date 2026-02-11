@@ -21,17 +21,17 @@
 
 
 module output_shift_register #(
+    parameter N=3,
     parameter OUTPUT_WIDTH=16
-
-    )(
+)(
     input logic clk,
     input logic rst_n,
-    input logic [OUTPUT_WIDTH-1:0] data_in[0:4],
-    input logic [0:4] valid_bit_in,
-    output logic [OUTPUT_WIDTH-1:0]data_out[0:2][0:2],
+    input logic [OUTPUT_WIDTH-1:0] data_in[0:2*N-2],
+    input logic [0:2*N-2] valid_bit_in,
+    output logic [OUTPUT_WIDTH-1:0]data_out[0:N-1][0:N-1],
     output logic valid_bit_out
     );
-    logic [OUTPUT_WIDTH-1:0]data_out_reg[0:2][0:2];
+    logic [OUTPUT_WIDTH-1:0]data_out_reg[0:N-1][0:N-1];
     logic valid_bit_out_reg;
     always_ff@(posedge clk)
     begin
@@ -42,29 +42,31 @@ module output_shift_register #(
         end
         else
         begin
-            if(&valid_bit_in)
-            begin 
-                data_out_reg[0][2]<=data_in[0];
-                data_out_reg[0][1]<=data_in[1];
-                data_out_reg[0][0]<=data_in[2];
-                data_out_reg[1][0]<=data_in[3];
-                data_out_reg[2][0]<=data_in[4];
-            end
-            else if(&valid_bit_in[1:3])
+            for( int i= 0;i< N; ++i)
             begin
-                data_out_reg[1][2]<=data_in[1];
-                data_out_reg[1][1]<=data_in[2];
-                data_out_reg[2][1]<=data_in[3];
-            end 
-            else if(valid_bit_in[2])
-            begin
-                data_out_reg[2][2]<=data_in[2];
-                valid_bit_out_reg<=1'b1;
-            end
-            else
-            begin
-                data_out_reg<=data_out_reg;
-                valid_bit_out_reg<=1'b0;
+                // Create a temporary mask for the bits [i : 2*N-2-i]
+                logic [0:2*N-2] mask;
+                mask = '0;
+                for (int m = 0; m < 2*N-1; m++) begin
+                     if (m >= i && m <= (2*N-2-i)) 
+                        mask[m] = 1'b1;
+                end
+
+                // Now check if all bits covered by the mask are high in the input
+                if ((valid_bit_in & mask) == mask) begin
+                    for(int j=0;j<N-i;j++)
+                    begin
+                        data_out_reg[i][N-1-j]<=data_in[i+j];
+                    end
+                    for (int k = 1; k < (N - i); k++) 
+                    begin
+                        data_out_reg[i+k][i] <= data_in[N-1+k];
+                    end 
+                    if (i == N-1) begin
+                        valid_bit_out_reg <= 1'b1;
+                    end
+                    break;
+                end
             end
         end
     end
