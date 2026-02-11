@@ -23,7 +23,7 @@
 module top_level_tb(
 
     );
-    localparam N=3;
+    localparam N=5;
     localparam DATA_WIDTH=8;
     localparam OUTPUT_WIDTH=16;
     
@@ -36,11 +36,13 @@ module top_level_tb(
     logic valid_bit_b_in [0:N-1][0:N-1];
     logic [OUTPUT_WIDTH-1:0] c[0:N-1][0:N-1];
     logic valid_bit_out;
+
+
     
     top_level_file #(
         .DATA_WIDTH(8),
         .OUTPUT_WIDTH(16),
-        .N(3)
+        .N(N)
     ) dut(
         .clk(clk),
         .rst_n(rst_n),
@@ -75,13 +77,16 @@ module top_level_tb(
         #20 rst_n = 1;
         @(posedge clk);
         
-        a='{'{-1,2,-3},'{4,-5,6},'{-7,8,-9}};
-        valid_bit_a_in='{'{1,1,1},'{1,1,1},'{1,1,1}};
-        b='{'{-9,8,-7},'{6,-5,4},'{-3,2,-1}};
-        valid_bit_b_in='{'{1,1,1},'{1,1,1},'{1,1,1}};
-        @(posedge clk);
-        @(posedge clk);
-        @(posedge clk);
+        a='{'{1,2,3,4,5},'{6,7,8,9,10},'{11,12,13,14,15},'{16,17,18,19,20},'{21,22,23,24,25}};
+        valid_bit_a_in='{'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1}};
+        b='{'{25,24,23,22,21},'{20,19,18,17,16},'{15,14,13,12,11},'{10,9,8,7,6},'{5,4,3,2,1}};
+        valid_bit_b_in='{'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1}};
+        
+        for(int i=0;i<N;++i)
+        begin
+            @(posedge clk);
+        end
+       
         // End of data
         clear_inputs();
     
