@@ -1,144 +1,85 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 01.02.2026 16:13:26
-// Design Name: 
+// Company:
+// Engineer:
+//
+// Create Date: 04.02.2026 15:29:59
+// Design Name:
 // Module Name: matrix_row_shifter
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
+// Project Name:
+// Target Devices:
+// Tool Versions:
+// Description:
+//
+// Dependencies:
+//
 // Revision:
 // Revision 0.01 - File Created
 // Additional Comments:
-// 
+//
 //////////////////////////////////////////////////////////////////////////////////
 
 
 module matrix_row_shifter #(
     parameter N = 3,
-    parameter DATA_WIDTH = 8
+    parameter DATA_WIDTH = 8,
+    parameter SHIFT_LEN = 2*N - 1
 )(
-    input logic clk,
-    input logic rst_n,
-    input logic row_sel,
-    input logic  valid_bits_in [0:N-1][0:N-1],
-    input logic [DATA_WIDTH-1:0] matrix [0:N-1][0:N-1],  // 3x3 input matrix
-    output logic [DATA_WIDTH-1:0] out_data  [0:4],         // 5-element output
-    output logic valid_bits_out [0:4]
+    input  logic clk,
+    input  logic rst_n,
+    input  logic row_sel,
+
+    input  logic valid_bits_in [0:N-1][0:N-1],
+    input  logic [DATA_WIDTH-1:0] matrix [0:N-1][0:N-1],
+
+    output logic [DATA_WIDTH-1:0] out_data [0:SHIFT_LEN-1],
+    output logic valid_bits_out [0:SHIFT_LEN-1] 
 );
 
-    // Internal state machine and registers
-    logic [$clog2(N):0] state;        // 0=idle, 1-3=rows
-    logic [DATA_WIDTH-1:0] shift_reg [0:4];  // 5 positions
-    logic valid_shift_reg [0:4];
     
+
+    logic [DATA_WIDTH-1:0] shift_reg [0:SHIFT_LEN-1];
+    logic valid_shift_reg [0:SHIFT_LEN-1];
+    logic [$clog2(N)-1:0] state;
+    integer i;
+
     always_ff @(posedge clk or negedge rst_n) begin
-        if (row_sel && !rst_n) begin
+        if (!rst_n) begin
             state <= 0;
-            valid_shift_reg <= '{5{1'b0}};
+            valid_shift_reg <= '{SHIFT_LEN{1'b0}};
         end
-        if (row_sel && rst_n) begin
-            case (state)
-                0: begin  // Load first row + zeros
-                    shift_reg[0] <= matrix[0][0];  // 1
-                    shift_reg[1] <= matrix[0][1];  // 2  
-                    shift_reg[2] <= matrix[0][2];  // 3
-                    shift_reg[3] <= 0;
-                    shift_reg[4] <= 0;
-                    valid_shift_reg[0] <= valid_bits_in[0][0];  // 1
-                    valid_shift_reg[1] <= valid_bits_in[0][1];  // 2  
-                    valid_shift_reg[2] <= valid_bits_in[0][2];  // 3
-                    valid_shift_reg[3] <= 1;
-                    valid_shift_reg[4] <= 1;
-                    state <= 1;
+        else begin
+
+            /* Clear entire register */
+            for (i = 0; i < SHIFT_LEN; i++) begin
+                shift_reg[i] <= '0;
+                valid_shift_reg[i] <= 1'b1;
+            end
+
+            /* Inject data depending on row/column mode */
+            for (i = 0; i < N; i++) begin
+
+                if (row_sel) begin
+                    shift_reg[state + i] <= matrix[state][i];
+                    valid_shift_reg[state + i] <= valid_bits_in[state][i];
                 end
-                1: begin  // Shift LEFT, load row1 at RIGHT
-                    shift_reg[0] <= 0;           // New zero
-                    shift_reg[1] <= matrix[1][0]; // 1→pos1
-                    shift_reg[2] <= matrix[1][1]; // 2→pos2  
-                    shift_reg[3] <= matrix[1][2]; // 4→pos3
-                    shift_reg[4] <= 0; // 5→pos4
-                    valid_shift_reg[0] <= 1;           // New zero
-                    valid_shift_reg[1] <= valid_bits_in[1][0]; // 1→pos1
-                    valid_shift_reg[2] <= valid_bits_in[1][1]; // 2→pos2  
-                    valid_shift_reg[3] <= valid_bits_in[1][2]; // 4→pos3
-                    valid_shift_reg[4] <= 1; // 5
-                    state <= 2;
+                else begin
+                    shift_reg[state + i] <= matrix[i][state];
+                    valid_shift_reg[state + i] <= valid_bits_in[i][state];
                 end
-                2: begin  // Continue shift pattern
-                    shift_reg[0] <= 0;
-                    shift_reg[1] <= 0; 
-                    shift_reg[2] <= matrix[2][0]; 
-                    shift_reg[3] <= matrix[2][1]; // 7→pos3
-                    shift_reg[4] <= matrix[2][2]; // 8→pos4
-                    valid_shift_reg[0] <= 1;
-                    valid_shift_reg[1] <= 1; 
-                    valid_shift_reg[2] <= valid_bits_in[2][0]; 
-                    valid_shift_reg[3] <= valid_bits_in[2][1]; // 7→pos3
-                    valid_shift_reg[4] <= valid_bits_in[2][2]; // 8→pos4
-                    state <= 0;
-                end
-            endcase
+
+            end
+
+            /* State update */
+            if (state == N-1)
+                state <= 0;
+            else
+                state <= state + 1;
+
         end
     end
-    
-    always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n && !row_sel) begin
-            state <= 0;
-            valid_shift_reg <= '{5{1'b0}};
-        end
-        if (rst_n && !row_sel) begin
-            case (state)
-                0: begin  // Load first row + zeros
-                    shift_reg[0] <= matrix[0][0];  // 1
-                    shift_reg[1] <= matrix[1][0];  // 2  
-                    shift_reg[2] <= matrix[2][0];  // 3
-                    shift_reg[3] <= '0;
-                    shift_reg[4] <= '0;
-                    valid_shift_reg[0] <= valid_bits_in[0][0];  // 1
-                    valid_shift_reg[1] <= valid_bits_in[1][0];  // 2  
-                    valid_shift_reg[2] <= valid_bits_in[2][0];  // 3
-                    valid_shift_reg[3] <= 1;
-                    valid_shift_reg[4] <= 1;
-                    state <= 1;
-                end
-                1: begin  // Shift LEFT, load row1 at RIGHT
-                    shift_reg[0] <= 0;           // New zero
-                    shift_reg[1] <= matrix[0][1]; // 1→pos1
-                    shift_reg[2] <= matrix[1][1]; // 2→pos2  
-                    shift_reg[3] <= matrix[2][1]; // 4→pos3
-                    shift_reg[4] <= 0; // 5→pos4
-                    valid_shift_reg[0] <= 1;           // New zero
-                    valid_shift_reg[1] <= valid_bits_in[0][1]; // 1→pos1
-                    valid_shift_reg[2] <= valid_bits_in[1][1]; // 2→pos2  
-                    valid_shift_reg[3] <= valid_bits_in[2][1]; // 4→pos3
-                    valid_shift_reg[4] <= 1; // 5
-                    state <= 2;
-                end
-                2: begin  // Continue shift pattern
-                    shift_reg[0] <= '0;
-                    shift_reg[1] <= '0; 
-                    shift_reg[2] <= matrix[0][2]; 
-                    shift_reg[3] <= matrix[1][2]; // 7→pos3
-                    shift_reg[4] <= matrix[2][2]; // 8→pos4
-                    valid_shift_reg[0] <= 1;
-                    valid_shift_reg[1] <= 1; 
-                    valid_shift_reg[2] <= valid_bits_in[0][2]; 
-                    valid_shift_reg[3] <= valid_bits_in[1][2]; // 7→pos3
-                    valid_shift_reg[4] <= valid_bits_in[2][2]; // 8→pos4
-                    state <= 0;
-                end
-            endcase
-        end
-    end    
 
-    
-    assign out_data = shift_reg;  // Direct connection
+    assign out_data = shift_reg;
     assign valid_bits_out = valid_shift_reg;
+
 endmodule
