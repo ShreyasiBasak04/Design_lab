@@ -35,15 +35,16 @@ module top_level_file #(
     output logic valid_bit_out
   );
     
-    logic [DATA_WIDTH-1:0]a_staggered_output[0:4];
-    logic valid_bit_a_staggered_output[0:4];
-    logic [DATA_WIDTH-1:0]b_staggered_output[0:4];
-    logic valid_bit_b_staggered_output[0:4];
-    logic [OUTPUT_WIDTH-1:0] s_out_staggered[0:4];
-    logic [0:4] valid_bit_out_staggered;
+    logic [DATA_WIDTH-1:0]a_staggered_output[0:2*N-2];
+    logic valid_bit_a_staggered_output[0:2*N-2];
+    logic [DATA_WIDTH-1:0]b_staggered_output[0:2*N-2];
+    logic valid_bit_b_staggered_output[0:2*N-2];
+    logic [OUTPUT_WIDTH-1:0] s_out_staggered[0:2*N-2];
+    logic [0:2*N-2] valid_bit_out_staggered;
+    
     
     matrix_row_shifter #(
-        .N(3),
+        .N(N),
         .DATA_WIDTH(8)
     ) row_shifter(
         .clk(clk),
@@ -56,7 +57,7 @@ module top_level_file #(
     );
     
     matrix_row_shifter #(
-        .N(3),
+        .N(N),
         .DATA_WIDTH(8)
     ) col_shifter(
         .clk(clk),
@@ -69,7 +70,7 @@ module top_level_file #(
     );
     
     dense_mult #(
-        .N(3),
+        .N(N),
         .DATA_WIDTH(8),
         .OUTPUT_WIDTH(16)
     )   sys_array(
@@ -84,6 +85,7 @@ module top_level_file #(
     );
     
     output_shift_register #(
+        .N(N),
         .OUTPUT_WIDTH(16)
     )   output_shifter(
         .clk(clk),
