@@ -28,28 +28,29 @@ module matrix_row_shifter #(
     input  logic clk,
     input  logic rst_n,
     input  logic row_sel,
+    input logic staggered_start,
+    input  logic [N-1:0][N-1:0]valid_bits_in,
+    input  logic [N-1:0][N-1:0][DATA_WIDTH-1:0] matrix,
 
-    input  logic valid_bits_in [0:N-1][0:N-1],
-    input  logic [DATA_WIDTH-1:0] matrix [0:N-1][0:N-1],
-
-    output logic [DATA_WIDTH-1:0] out_data [0:SHIFT_LEN-1],
-    output logic valid_bits_out [0:SHIFT_LEN-1] 
+    output logic [SHIFT_LEN-1:0][DATA_WIDTH-1:0] out_data,
+    output logic [SHIFT_LEN-1:0]valid_bits_out 
 );
 
     
 
-    logic [DATA_WIDTH-1:0] shift_reg [0:SHIFT_LEN-1];
-    logic valid_shift_reg [0:SHIFT_LEN-1];
-    logic [$clog2(N)-1:0] state;
+    logic [SHIFT_LEN-1:0][DATA_WIDTH-1:0] shift_reg ;
+    logic [SHIFT_LEN-1:0]valid_shift_reg;
+    logic [$clog2(N):0] state;
     integer i;
 
-    always_ff @(posedge clk or negedge rst_n) begin
+    always_ff @(posedge clk) begin
         if (!rst_n) begin
             state <= 0;
             valid_shift_reg <= '{SHIFT_LEN{1'b0}};
         end
         else begin
-
+            if(staggered_start)
+            begin
             /* Clear entire register */
             for (i = 0; i < SHIFT_LEN; i++) begin
                 shift_reg[i] <= '0;
@@ -57,7 +58,7 @@ module matrix_row_shifter #(
             end
 
             /* Inject data depending on row/column mode */
-            for (i = 0; i < N; i++) begin
+            for (i = 0; i < N && state<N; i++) begin
 
                 if (row_sel) begin
                     shift_reg[state + i] <= matrix[state][i];
@@ -71,10 +72,16 @@ module matrix_row_shifter #(
             end
 
             /* State update */
-            if (state == N-1)
-                state <= 0;
+            if (state == N)
+            begin
+                state<=N;
+                shift_reg<='{default:'0};
+                valid_shift_reg<='{default: '0};
+            end
             else
                 state <= state + 1;
+           
+            end
 
         end
     end
