@@ -3,7 +3,7 @@
 // Company: 
 // Engineer: 
 // 
-// Create Date: 01.02.2026 18:47:06
+// Create Date: 01/29/2026 07:49:31 PM
 // Design Name: 
 // Module Name: mac_pe
 // Project Name: 
@@ -22,18 +22,18 @@
 
 module mac_pe #(
     parameter DATA_WIDTH=8,
-    parameter OUTPUT_WIDTH=32
+    parameter OUTPUT_WIDTH=16
 )(
     input logic clk,
     input logic rst_n,
-   
+    
     input logic [DATA_WIDTH-1:0] a_in,
     input logic [DATA_WIDTH-1:0] b_in,
     input logic [OUTPUT_WIDTH-1:0] c_in,
     input logic valid_bit_a_in,
     input logic valid_bit_b_in,
     input logic valid_bit_c_in,
-       
+        
     output logic [OUTPUT_WIDTH-1:0] s_out,
     output logic [DATA_WIDTH-1:0] a_out,
     output logic [DATA_WIDTH-1:0] b_out,
@@ -71,11 +71,11 @@ module mac_pe #(
             end
             else
             begin
-                s_reg<=c_in;
+                s_reg<=s_reg;
             end
         end
     end
-   
+    
     assign a_out=a_reg;
     assign b_out=b_reg;
     assign s_out=s_reg;
