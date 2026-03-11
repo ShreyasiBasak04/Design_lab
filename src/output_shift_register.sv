@@ -26,26 +26,30 @@ module output_shift_register #(
 )(
     input logic clk,
     input logic rst_n,
-    input logic [OUTPUT_WIDTH-1:0] data_in[0:2*N-2],
-    input logic [0:2*N-2] valid_bit_in,
-    output logic [OUTPUT_WIDTH-1:0]data_out[0:N-1][0:N-1],
-    output logic valid_bit_out
-    );
-    logic [OUTPUT_WIDTH-1:0]data_out_reg[0:N-1][0:N-1];
-    logic valid_bit_out_reg;
+    input logic [2*N-2:0][OUTPUT_WIDTH-1:0] data_in,
+    input logic [2*N-2:0] valid_bit_in,
+    output logic [N-1:0][N-1:0][OUTPUT_WIDTH-1:0]data_out,
+    output logic [N-1:0][N-1:0]valid_bit_out,
+    output logic stream_output_start
+  );
+    logic [N-1:0][N-1:0][OUTPUT_WIDTH-1:0]data_out_reg;
+    logic [N-1:0][N-1:0]valid_bit_out_reg;
+    logic match_found;
+    logic [2*N-2:0] mask;
     always_ff@(posedge clk)
     begin
         if(~rst_n)
         begin 
             data_out_reg<='{default:'0};
-            valid_bit_out_reg<=1'b0;
+            valid_bit_out_reg<='{default:'0};
         end
         else
         begin
+            match_found = 1'b0;
             for( int i= 0;i< N; ++i)
             begin
                 // Create a temporary mask for the bits [i : 2*N-2-i]
-                logic [0:2*N-2] mask;
+
                 mask = '0;
                 for (int m = 0; m < 2*N-1; m++) begin
                      if (m >= i && m <= (2*N-2-i)) 
@@ -53,19 +57,22 @@ module output_shift_register #(
                 end
 
                 // Now check if all bits covered by the mask are high in the input
-                if ((valid_bit_in & mask) == mask) begin
+                if (!match_found && ((valid_bit_in & mask) == mask)) begin
+                    match_found <= 1'b1;
+                    if(i==0)
+                       stream_output_start<=1'b1;
+                    else
+                        stream_output_start<=1'b0;
                     for(int j=0;j<N-i;j++)
                     begin
                         data_out_reg[i][N-1-j]<=data_in[i+j];
+                        valid_bit_out_reg[i][N-1-j]<=valid_bit_in[i+j];
                     end
                     for (int k = 1; k < (N - i); k++) 
                     begin
                         data_out_reg[i+k][i] <= data_in[N-1+k];
+                        valid_bit_out_reg[i+k][i] <= valid_bit_in[N-1+k];
                     end 
-                    if (i == N-1) begin
-                        valid_bit_out_reg <= 1'b1;
-                    end
-                    break;
                 end
             end
         end
