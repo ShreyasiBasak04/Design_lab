@@ -29,26 +29,26 @@ module dense_mult #(
     input  logic rst_n,
     
     // Inputs from the bottom (a values) - N columns
-    input  logic [DATA_WIDTH-1:0] a_in_bus [0:2*N-2], 
-    input logic  valid_bit_a_in [0:2*N-2],
+    input  logic [2*N-2:0][DATA_WIDTH-1:0] a_in_bus, 
+    input logic  [2*N-2:0]valid_bit_a_in,
     // Inputs from the left (b values) - N rows
-    input  logic [DATA_WIDTH-1:0] b_in_bus [0:2*N-2],
-    input logic valid_bit_b_in[0:2*N-2],
+    input  logic [2*N-2:0][DATA_WIDTH-1:0] b_in_bus,
+    input logic [2*N-2:0]valid_bit_b_in,
     // Outputs (Final accumulated values)
-    output logic [OUTPUT_WIDTH-1:0] s_out_bus [0:2*N-2],
-    output logic [0:2*N-2] valid_bit_s_out
+    output logic [2*N-2:0][OUTPUT_WIDTH-1:0] s_out_bus,
+    output logic [2*N-2:0] valid_bit_s_out
 );
 
     // Internal wires with generic dimensions
     // a_wire: N+1 rows, N columns (data flows up)
-    logic [DATA_WIDTH-1:0] a_wire [0:2*N-1][0:2*N-2];
-    logic valid_bit_a_wire [0:2*N-1][0:2*N-2];
+    logic [2*N-1:0][2*N-2:0][DATA_WIDTH-1:0] a_wire;
+    logic [2*N-1:0][2*N-2:0]valid_bit_a_wire;
     // b_wire: N rows, N+1 columns (data flows right)
-    logic [DATA_WIDTH-1:0] b_wire [0:2*N-2][0:2*N-1];
-    logic valid_bit_b_wire [0:2*N-2][0:2*N-1];
+    logic [2*N-2:0][2*N-1:0][DATA_WIDTH-1:0] b_wire ;
+    logic [2*N-2:0][2*N-1:0]valid_bit_b_wire;
     // c_wire: N+1 rows, N+1 columns (data flows diagonally)
-    logic [OUTPUT_WIDTH-1:0] c_wire [0:2*N-1][0:2*N-1];
-    logic valid_bit_c_wire [0:2*N-1][0:2*N-1];
+    logic [2*N-1:0][2*N-1:0][OUTPUT_WIDTH-1:0] c_wire;
+    logic [2*N-1:0][2*N-1:0]valid_bit_c_wire ;
     // --- Boundary Assignments ---
     generate
         for (genvar i = 0; i < 2*N-1; i++) begin : boundaries
@@ -74,7 +74,7 @@ module dense_mult #(
     generate
         for (genvar r = 0; r < N; r++) begin : row_gen
             for (genvar c = 0; c < N+r; c++) begin : col_gen
-                mac_pe #(8,16) pe_inst (
+                mac_pe #(DATA_WIDTH,OUTPUT_WIDTH) pe_inst (
                     .clk   (clk),
                     .rst_n (rst_n),
                     .a_in  (a_wire[r][c]),
@@ -98,7 +98,7 @@ module dense_mult #(
         end
         for(genvar r=N;r<2*N-1;r++)begin :row_gen1
             for (genvar c= r-N+1;c<2*N-1;c++) begin: col_gen1
-                mac_pe #(8,16) pe_inst1 (
+                mac_pe #(DATA_WIDTH,OUTPUT_WIDTH) pe_inst1 (
                     .clk   (clk),
                     .rst_n (rst_n),
                     .a_in  (a_wire[r][c]),
@@ -119,7 +119,7 @@ module dense_mult #(
         
         for(genvar r=0;r<N-1;r++) begin : buffer_row_gen1
             for (genvar c=N+r; c<2*N-1;c++) begin : buffer_col_gen1
-                    buffer #(8) b_a(
+                    buffer #(DATA_WIDTH) b_a(
                         .clk(clk),
                         .rst_n(rst_n),
                         .valid_bit_in(valid_bit_a_wire[r][c]),
@@ -132,7 +132,7 @@ module dense_mult #(
         
         for(genvar r=N;r<2*N-1;r++) begin : buffer_row_gen2
             for (genvar c=0; c<r-N+1;c++) begin : buffer_col_gen2
-                    buffer #(8) b_a(
+                    buffer #(DATA_WIDTH) b_a(
                         .clk(clk),
                         .rst_n(rst_n),
                         .valid_bit_in(valid_bit_b_wire[r][c]),
@@ -148,7 +148,8 @@ module dense_mult #(
             assign valid_bit_s_out[c-N]=valid_bit_c_wire[2*N-1][c];
         end
         
-        for (genvar r=2*N-2;r>=N-1;--r) begin: output_row_ass
+        for (genvar k = 0; k < N; k++) begin: output_row_ass
+            localparam int r = 2*N-2-k;
             assign s_out_bus[3*N-2-r]=c_wire[r][2*N-1];
             assign valid_bit_s_out[3*N-2-r]=valid_bit_c_wire[r][2*N-1];
         end   
