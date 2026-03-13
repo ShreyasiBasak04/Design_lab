@@ -42,11 +42,40 @@ module top_level_tb(
     logic valid_bit_a_in_fixed[0:N-1][0:N-1];
     logic [DATA_WIDTH-1:0] b_fixed[0:N-1][0:N-1];
     logic valid_bit_b_in_fixed[0:N-1][0:N-1];
-    assign a_fixed='{'{1,2,3,4,5},'{6,7,8,9,10},'{11,12,13,14,15},'{16,17,18,19,20},'{21,22,23,24,25}};
-    assign valid_bit_a_in_fixed='{'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1}};
-    assign b_fixed='{'{25,24,23,22,21},'{20,19,18,17,16},'{15,14,13,12,11},'{10,9,8,7,6},'{5,4,3,2,1}};
-    assign valid_bit_b_in_fixed='{'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1},'{1,1,1,1,1}};
-        
+    
+    integer infile;
+    integer outfile;
+    integer r;
+    integer row = 0;
+    integer col = 0;
+    
+    initial 
+    begin
+        //$display("Simulation working directory: %s", $getcwd());
+        infile = $fopen("input.mem","r");
+
+        if(infile == 0) begin
+            $display("ERROR: input file not found");
+            $finish;
+        end
+
+    // Read matrix A
+        for(int i=0;i<N;i++) begin
+            for(int j=0;j<N;j++) begin
+                r = $fscanf(infile,"%d",a_fixed[i][j]);
+                valid_bit_a_in_fixed[i][j] = 1;
+            end
+        end
+
+    // Read matrix B
+        for(int i=0;i<N;i++) begin
+            for(int j=0;j<N;j++) begin
+                r = $fscanf(infile,"%d",b_fixed[i][j]);
+                valid_bit_b_in_fixed[i][j] = 1;
+            end
+        end
+
+    end
     top_level_file #(
         .DATA_WIDTH(8),
         .OUTPUT_WIDTH(16),
@@ -63,7 +92,18 @@ module top_level_tb(
         .c_stream_valid(c_stream_valid),
         .done(done)
     );
-    
+    always @(posedge clk) begin
+        if(!done && c_stream_valid) begin
+           $fwrite(outfile,"%0d ",c_stream);
+           col = col + 1;
+
+            if(col == N) begin
+                $fwrite(outfile,"\n");
+                col = 0;
+                row = row + 1;
+            end
+        end
+    end
     initial begin
         clk = 0;
         forever #5 clk = ~clk;
@@ -80,6 +120,7 @@ module top_level_tb(
     
     initial begin
         // Initialize
+        outfile = $fopen("output.mem","w");
         rst_n = 0;
         start=0;
         clear_inputs();
@@ -108,6 +149,8 @@ module top_level_tb(
     
         // Wait for the systolic wave to reach the end
         repeat (50) @(posedge clk);
+        $fclose(infile);
+        $fclose(outfile);
         $finish;
-    end
+    end    
 endmodule
